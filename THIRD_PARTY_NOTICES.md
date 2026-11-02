@@ -54,3 +54,15 @@ app's data and APK; uninstall/disable the original dsh-app-pet *plugin*
 before using Fish. Do not have multiple plugins simultaneously writing the
 same bubble-cmd.json mailbox. Removing Fish may leave host appearance config;
 use the original bubble tool to restore it rather than deleting host data.
+
+## Fish v1.2.0 extensions
+
+- New original `lib/fish-life.mjs`: opt-in study/water reminders,
+  playful short-text selection, quiet hours, minimum 15-minute cooldown,
+  explicit off action. These are original Fish additions, not upstream code.
+- New `presets/playful.json`: only references original 24 unchanged WebM
+  assets; does not create/claim additional animation copyrights.
+- Timer/notification text is not a system alarm, voice, chat service, or a
+  permission to perform unwanted Android operations.
+- The upstream author, original animators and CC BY-NC-SA character credits
+  above remain required in every derivative archive.
