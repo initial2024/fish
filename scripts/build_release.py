@@ -86,6 +86,18 @@ def transform(js):
             !/^[a-z][a-z0-9-]{0,63}$/.test(assetName)) {
           return {ok:false,error:'动作文件名包含非法字符'};
         }""","asset_names")
+    js=sub(js,
+        """\t\t// 先清旧回执：否则上一轮的 ok 会被当成本轮的答案。
+\t\ttry { fs.unlinkSync(resPath); } catch { /* 不存在就是已经干净了 */ }
+\t\twriteJsonAtomic(cmdPath, { id, ...payload });""",
+        """\t\t// Multiple DSH plugins share this native mailbox. Never stomp a
+        // pending command or delete another tool's ack. Existing id matching
+        // already rejects stale replies (confirmed by upstream implementation).
+        if (fs.existsSync(cmdPath)) {
+          return {ok:false,message:'原生信箱忙：为避免覆盖其它插件命令，未发送'};
+        }
+\t\twriteJsonAtomic(cmdPath, { id, ...payload });""",
+        "shared_mailbox_guard")
     js=sub(js,"/**\n * 启动时下发一次（带重试）。",
            """/**
  * Serialize ONLY this fork's automatic/manual mailbox writes. The separate
