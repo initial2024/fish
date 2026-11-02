@@ -1,26 +1,50 @@
-# Fish · DSH Android floating pet (independent derivative)
+# Fish · DSH Android floating desktop pet v1.1.0
 
-This public repository is for a **non-commercial** derivative of the
-`dsh-app-pet@1.0.3` Android floating pet plugin.
+Unofficial derivative of **dsh-app-pet@1.0.3**, intended for
+**noncommercial** open-source use only.
 
-## Mandatory upstream credit and licensing notice
+Original plugin: https://www.npmjs.com/package/dsh-app-pet
+Original assets/character: https://github.com/PC2005-cloud/dsh-pet
+Original Android host: https://github.com/pht88888888/DSHAPP
 
-- Original Android floating-pet plugin: `dsh-app-pet` v1.0.3, npm
-  https://www.npmjs.com/package/dsh-app-pet
-- Original Android DSH integration: https://github.com/pht88888888/DSHAPP
-  (upstream Android host; its source/app is not copied here).
-- Character animation sources: `PC2005-cloud/dsh-pet`,
-  https://github.com/PC2005-cloud/dsh-pet , Copyright (c) 2026 PC2005-cloud.
-- Original code declares MIT; **animation/assets carry additional
-  non-commercial usage and attribution terms**, not unrestricted MIT.
-  This repository is non-commercial and will retain asset attribution.
-- This work is **independent and unofficial**, not endorsed by the
-  original authors, DSH, DeepSeek, or OpenAI.
+## Upgrade relative to 1.0.3
 
-The original plugin's installation and its Android native host behavior must be
-verified before derivative builds can be considered operational. A build/CI
-success does not prove actual phone overlay behavior.
+- All original **24 transparent WebM videos** and **seven work-state
+  animations** retained. No video modified.
+- Reject unsafe preset paths, arbitrary media directories and bad file names.
+- An unknown tool action now fails, instead of silently applying a preset.
+- New distinct tool: fish_pet with actions status, list, apply, verify.
+- verify checks the full bundled preset offline WITHOUT overwriting the
+  current native bubble appearance.
+- New optional focus preset: less wandering, smaller size, shorter status
+  bubble; original pet preset remains the default.
+- Only this fork's own writes are serialized; original bubble is an external
+  writer, so no cross-process write-exclusivity is claimed.
+- Original applied-state file not overwritten. Optional
+  DSH_PET_FISH_DISABLE_BOOT=1 disables automatic apply at startup.
 
-## Development status
-Initialization / upstream auditing. Published files and test results, once
-available, must be verified before providing a direct install URL.
+## DSH Android direct URL (after CI publishes dist)
+
+https://raw.githubusercontent.com/initial2024/fish/main/dist/dsh-app-pet-fish-1.1.0.tgz
+
+Paste the TGZ URL into DSH plugin download, NOT an Android APK installer,
+Git clone URL or GitHub Actions artifact. First uninstall/disable the
+original dsh-app-pet plugin to avoid conflicts, and restart DSH. The native
+floating bubble must be enabled in the Android app.
+
+This package uses the existing native bubble-cmd.json/bubble-result.json
+interface. GitHub CI build success does not prove actual Android device
+playback or compatibility; real device acceptance is a separate gate.
+
+## Copyright, image rights, and disclaimer
+
+Code declares MIT (upstream LICENSE preserved), but **the video media is
+noncommercial, and the underlying character uses CC BY-NC-SA 4.0 terms**.
+Attribution and rights belong to their respective authors; this repository
+does not grant commercial use for media or character.
+
+Full attribution, exact changes and warranty disclaimer:
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Fork does not replace or re-sign DSH Android, delete app data, or grant
+Android permissions. Applied bubble settings may remain after uninstall.
