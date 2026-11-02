@@ -28,6 +28,8 @@ def extract_pinned(archive, output):
     with tarfile.open(archive,"r:gz") as stream:
         seen=set()
         for member in stream:
+            if member.isdir() and member.name.rstrip('/') == 'package':
+                continue
             p=Path(member.name)
             if (not member.isfile() or p.is_absolute() or
                 len(p.parts)<2 or p.parts[0]!="package" or
