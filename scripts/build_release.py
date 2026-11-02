@@ -28,12 +28,13 @@ def extract_pinned(archive, output):
     with tarfile.open(archive,"r:gz") as stream:
         seen=set()
         for member in stream:
-            if member.isdir() and member.name.rstrip('/') == 'package':
-                continue
             p=Path(member.name)
-            if (not member.isfile() or p.is_absolute() or
-                len(p.parts)<2 or p.parts[0]!="package" or
+            if (p.is_absolute() or not p.parts or p.parts[0]!="package" or
                 ".." in p.parts or member.name in seen):
+                raise RuntimeError("UNSAFE_UPSTREAM_ARCHIVE_ENTRY:"+member.name)
+            if member.isdir():
+                continue
+            if (not member.isfile() or len(p.parts)<2):
                 raise RuntimeError("UNSAFE_UPSTREAM_ARCHIVE_ENTRY:"+member.name)
             seen.add(member.name)
             dest=output.joinpath(*p.parts[1:])
