@@ -1,0 +1,35 @@
+name: Audit upstream dsh-app-pet
+on:
+  push:
+    branches: [feat/upgrade-pet-1-0-3-20261102]
+    paths: [.github/workflows/upstream-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Fetch pinned upstream package and inspect public source
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fish-audit
+          cd /tmp/fish-audit
+          npm pack dsh-app-pet@1.0.3 --silent
+          tar -xzf dsh-app-pet-1.0.3.tgz
+          echo "---- TARBALL ----"
+          sha256sum dsh-app-pet-1.0.3.tgz
+          echo "---- MANIFEST ----"
+          node -e 'let p=require("./package/package.json");console.log(JSON.stringify({name:p.name,version:p.version,main:p.main,type:p.type,license:p.license,repository:p.repository,files:p.files,dependencies:p.dependencies,peerDependencies:p.peerDependencies,dsh:p.dsh},null,2))'
+          echo "---- FILES ----"
+          find package -type f | sed -n '1,100p'
+          echo "---- SOURCE KEYS ----"
+          rg -n 'export (const|function)|function |const |bubble|ctx\.|on\\(|register\\(|async |retry|preset|status|setTimeout|setInterval|apply\\(' package/lib package/presets package/cordis.patch.yml | head -145 || true
+          echo "---- INDEX FULL (BOUNDED) ----"
+          if test -f package/lib/index.js; then sed -n '301,850p' package/lib/index.js; fi
+          echo "---- PRESET FIRST ----"
+          if test -f package/presets/pet.json; then head -c 7500 package/presets/pet.json; fi

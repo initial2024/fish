@@ -1,0 +1,84 @@
+name: Fish v1.1.0 reproducible plugin build
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - "README.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - ".github/workflows/fish-release.yml"
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - "README.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - ".github/workflows/fish-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fetch exact original npm archive without installation scripts
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          cd upstream
+          test "$(npm pack --ignore-scripts --silent dsh-app-pet@1.0.3)" = "dsh-app-pet-1.0.3.tgz"
+          echo "Upstream SHA-256:"
+          sha256sum dsh-app-pet-1.0.3.tgz
+      - name: Deterministic source patch and 24 video import
+        run: |
+          set -euo pipefail
+          python3 scripts/build_release.py --source upstream/dsh-app-pet-1.0.3.tgz --output build/package
+          node --check build/package/lib/index.js
+          python3 -m py_compile scripts/build_release.py
+      - name: Independent integrity and DSH tool behavior tests
+        run: node --test tests/*.test.mjs
+      - name: Build standard npm-compatible direct-install TGZ
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          test "$(npm pack ./build/package --ignore-scripts --silent --pack-destination dist)" = "dsh-app-pet-fish-1.1.0.tgz"
+          tar -tzf dist/dsh-app-pet-fish-1.1.0.tgz | sort > /tmp/fish-entries.txt
+          for file in package/package.json package/lib/index.js package/cordis.patch.yml package/presets/pet.json package/presets/focus.json package/THIRD_PARTY_NOTICES.md package/LICENSE; do
+            grep -Fxq "$file" /tmp/fish-entries.txt
+          done
+          test "$(grep -cE '^package/assets/webm/[^/]+[.]webm$' /tmp/fish-entries.txt)" -eq 24
+          sha256sum dist/dsh-app-pet-fish-1.1.0.tgz > dist/dsh-app-pet-fish-1.1.0.tgz.sha256
+          cat dist/dsh-app-pet-fish-1.1.0.tgz.sha256
+      - name: Upload inspected test package (PRs)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fish-v1.1.0-test-package
+          path: |
+            dist/dsh-app-pet-fish-1.1.0.tgz
+            dist/dsh-app-pet-fish-1.1.0.tgz.sha256
+          retention-days: 7
+      - name: Publish fixed raw GitHub TGZ URL (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/dsh-app-pet-fish-1.1.0.tgz dist/dsh-app-pet-fish-1.1.0.tgz.sha256
+          if git diff --cached --quiet; then
+            echo "Same tarball already published"
+          else
+            git commit -m "dist: publish DSH fish v1.1.0 TGZ and checksum"
+            git push origin HEAD:main
+          fi
