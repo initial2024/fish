@@ -13,7 +13,7 @@ from pathlib import Path
 
 UPSTREAM_SHA="ef30c57434ce8066db8df98f46c8a5ac39141d31cdd82a19ee2705f11b1f8abd"
 NEW_NAME="dsh-app-pet-fish"
-NEW_VERSION="1.1.0"
+NEW_VERSION="1.2.0"
 
 def sub(source, old, new, label):
     if source.count(old) != 1:
@@ -45,7 +45,7 @@ def extract_pinned(archive, output):
 
 def transform(js):
     banner="""/**
- * Fish v1.1.0 is a noncommercial derivative of dsh-app-pet 1.0.3 (MIT
+ * Fish v1.2.0 is a noncommercial derivative of dsh-app-pet 1.0.3 (MIT
  * software); 24 original animation clips are by PC2005-cloud/dsh-pet,
  * Copyright (c) 2026 PC2005-cloud, with NONCOMMERCIAL asset/character
  * terms. Copyright/attribution: THIRD_PARTY_NOTICES.md.
@@ -55,6 +55,9 @@ def transform(js):
  */
 """
     js=banner+js
+    js=sub(js,"import fs from 'node:fs';",
+           "import fs from 'node:fs';\nimport {createLife, lifeTool} from './fish-life.mjs';",
+           "life_module_import")
     js=sub(js,"export const name = 'dsh-app-pet';",
            "export const name = 'dsh-app-pet-fish';","plugin_identity")
     js=sub(js,"name: 'deskpet',","name: 'fish_pet',","tool_identity")
@@ -83,6 +86,18 @@ def transform(js):
             !/^[a-z][a-z0-9-]{0,63}$/.test(assetName)) {
           return {ok:false,error:'动作文件名包含非法字符'};
         }""","asset_names")
+    js=sub(js,
+        """\t\t// 先清旧回执：否则上一轮的 ok 会被当成本轮的答案。
+\t\ttry { fs.unlinkSync(resPath); } catch { /* 不存在就是已经干净了 */ }
+\t\twriteJsonAtomic(cmdPath, { id, ...payload });""",
+        """\t\t// Multiple DSH plugins share this native mailbox. Never stomp a
+        // pending command or delete another tool's ack. Existing id matching
+        // already rejects stale replies (confirmed by upstream implementation).
+        if (fs.existsSync(cmdPath)) {
+          return {ok:false,message:'原生信箱忙：为避免覆盖其它插件命令，未发送'};
+        }
+\t\twriteJsonAtomic(cmdPath, { id, ...payload });""",
+        "shared_mailbox_guard")
     js=sub(js,"/**\n * 启动时下发一次（带重试）。",
            """/**
  * Serialize ONLY this fork's automatic/manual mailbox writes. The separate
@@ -117,6 +132,23 @@ function applySerialized(home,preset) {
               return {ok:true,message:'本地资源检查通过：'+built.note+
                 '。原生悬浮球渲染尚未在此检查中验收。'};
             }""","deny_unknown_and_verify")
+    js=sub(js,"ctx.tools.register(deskpetTool(home));",
+           """ctx.tools.register(deskpetTool(home));
+        // Optional, separately registered feature. Never fail app startup.
+        try {
+          let lifeId=1300000;
+          const lifeSend=(payload)=>{
+            const pending=fishTail.then(()=>sendCommand(home,lifeId++,payload));
+            fishTail=pending.catch(()=>{});
+            if(lifeId>1500000)lifeId=1300000;
+            return pending;
+          };
+          const life=createLife({home,notify:lifeSend});
+          ctx.tools.register(lifeTool(life));
+          if(typeof ctx.effect==='function')ctx.effect(()=>()=>life.close());
+        }catch(error){
+          log('Fish Life 未激活；原桌宠继续工作: '+(error?.message??error));
+        }""","register_optional_life")
     js=sub(js,"if (applied === print) {",
            """if (process.env.DSH_PET_FISH_DISABLE_BOOT === '1') {
       log('Fish 自动下发已关闭，使用 fish_pet apply 手动启用');
@@ -147,6 +179,9 @@ def main():
     (base/"package.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n")
     source_file=base/"lib/index.js"
     source_file.write_text(transform(source_file.read_text()))
+    # Independent, original source maintained as pinned derivative.
+    (base/"lib/fish-life.mjs").write_bytes(
+        (Path(__file__).resolve().parent/"fish-life.mjs").read_bytes())
     patch_file=base/"cordis.patch.yml"
     patch=patch_file.read_text()
     if "dsh-app-pet" not in patch:raise RuntimeError("CORDIS_PATCH_ID_NOT_FOUND")
@@ -159,15 +194,32 @@ def main():
     focus["appearance"]["size"]=140
     focus["appearance"]["throwEnabled"]=False
     focus["statusAutoHideMs"]=2500
+    playful=copy.deepcopy(preset)
+    playful["name"]="Fish Playful (调皮摸鱼)"
+    playful["description"]="保留原版24段WebM，偏爱伸懒腰、偷吃和东张西望"
+    playful["move"]["enabled"]=True
+    playful["move"]["intervalSec"]=35
+    playful["move"]["minDp"]=20
+    playful["move"]["maxDp"]=75
+    playful["poolWeights"]["idle"]=10
+    playful["poolWeights"]["turn"]=4
+    idle=playful["pools"]["idle"]
+    playful["pools"]["idle"]=(["snack","yawn","rubik","stretch","fan"]+
+        [a for a in idle if a not in {"snack","yawn","rubik","stretch","fan"}])
+    playful["statusAutoHideMs"]=2500
+    (base/"presets/playful.json").write_text(
+        json.dumps(playful,ensure_ascii=False,indent=2)+"\n")
     (base/"presets/focus.json").write_text(
         json.dumps(focus,ensure_ascii=False,indent=2)+"\n")
     notices=Path(__file__).resolve().parents[1]/"THIRD_PARTY_NOTICES.md"
     (base/"THIRD_PARTY_NOTICES.md").write_bytes(notices.read_bytes())
     (base/"FISH_CHANGELOG.md").write_text(
-        "Fish v1.1.0 fork of dsh-app-pet@1.0.3: separate package/tool, strict "
+        "Fish v1.2.0 fork of dsh-app-pet@1.0.3: separate package/tool, strict "
         "preset/media name limits, unknown-action rejection, verify dry-run, "
         "serialized own mailbox calls, independent state marker, optional "
-        "boot disable and focus mode. Native Android code unchanged.\n")
+        "boot disable, focus/playful presets, opt-in study and water "
+        "reminders, quiet hours and playful text with OFF switch. "
+        "Native Android code unchanged; no new WebM or TTS.\n")
     print("SOURCE_SHA256_VERIFIED=YES")
     print("24_ORIGINAL_WEBM_UNMODIFIED=YES")
     print("7_STATES_PRESERVED=YES")

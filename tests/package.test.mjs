@@ -9,15 +9,19 @@ const pkg=path.resolve("build/package");
 const manifest=JSON.parse(fs.readFileSync(path.join(pkg,"package.json"),"utf8"));
 const original=JSON.parse(fs.readFileSync(path.join(pkg,"presets/pet.json"),"utf8"));
 const focus=JSON.parse(fs.readFileSync(path.join(pkg,"presets/focus.json"),"utf8"));
+const playful=JSON.parse(fs.readFileSync(path.join(pkg,"presets/playful.json"),"utf8"));
 
 test("derived identity, original 24 media clips, MIT and explicit noncommercial notices",()=>{
   assert.equal(manifest.name,"dsh-app-pet-fish");
-  assert.equal(manifest.version,"1.1.0");
+  assert.equal(manifest.version,"1.2.0");
   assert.equal(manifest.license,"MIT");
   assert.equal(Object.keys(original.actions).length,24);
   assert.equal(Object.keys(original.actionMap).length,7);
   assert.equal(Object.keys(focus.actionMap).length,7);
   assert.equal(focus.move.enabled,false);
+  assert.equal(playful.move.enabled,true);
+  assert.equal(Object.keys(playful.actions).length,24);
+  assert.equal(Object.keys(playful.actionMap).length,7);
   assert.equal(focus.appearance.throwEnabled,false);
   const webm=fs.readdirSync(path.join(pkg,"assets/webm")).filter(f=>f.endsWith(".webm"));
   assert.equal(webm.length,24);
@@ -42,9 +46,14 @@ test("tool is read-only unless specifically asked to apply; dangerous args fail 
     const mod=await import(pathToFileURL(path.join(pkg,"lib/index.js")).href);
     assert.equal(mod.name,"dsh-app-pet-fish");
     assert.deepEqual(mod.inject,["tools"]);
-    let tool;
-    mod.apply({tools:{register(t){tool=t;return ()=>{};}}});
-    assert.equal(tool.name,"fish_pet");
+    const tools=new Map();
+    mod.apply({tools:{register(t){tools.set(t.name,t);return ()=>{};}}});
+    const tool=tools.get("fish_pet");
+    assert.equal(tool?.name,"fish_pet");
+    assert.equal(tools.get("fish_pet_life")?.name,"fish_pet_life");
+    const status=await tools.get("fish_pet_life").execute({action:"status"});
+    assert.equal(status.ok,true);
+    assert.ok(status.message.includes('"enabled":false'));
     assert.deepEqual(tool.parameters.properties.action.enum,["apply","status","list","verify"]);
     let out=await tool.execute({action:"grant-root"});
     assert.equal(out.ok,false);
@@ -81,6 +90,8 @@ test("tool is read-only unless specifically asked to apply; dangerous args fail 
     const applied=JSON.parse(fs.readFileSync(path.join(home,"deskpet/fish-state.json"),"utf8"));
     assert.match(applied.fingerprint,/^[0-9a-f]{16}$/);
     assert.equal(fs.existsSync(path.join(home,"deskpet/state.json")),false);
+    // New timed interaction feature is strictly opt-in.
+    assert.equal(fs.existsSync(path.join(home,"deskpet/fish-life.json")),false);
   }finally{
     fs.rmSync(home,{recursive:true,force:true});
     delete process.env.DSH_HOME;
